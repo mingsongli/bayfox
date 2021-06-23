@@ -1,7 +1,8 @@
 import numpy as np
+import numpy.matlib
 import attr
 from bayfox.modelparams import get_draws
-
+from bayfox.utils import alphaT
 
 @attr.s()
 class Prediction:
@@ -78,6 +79,80 @@ def predict_d18oc(seatemp, d18osw, foram=None, seasonal_seatemp=False,
     return Prediction(ensemble=y)
 
 
+def pHCorrect(d18oc,seatemp,S,pH,cortype):
+    """
+    # function d18OpH = pHCorrect(d18oc,T,S,pH,cortype)
+    #
+    # this is an add-on for the BAYFOX forward model that corrects
+    # forward-modeled d18Oc for the "pH effect", sometimes called the
+    # "carbonate ion effect". The BAYFOX calibration uses coretop sediments
+    # that were deposited at presumably preindustrial/late Holocene ocean pH.
+    # However ocean pH changes with atmospheric pCO2 so for deep-time
+    # applications, a correction needs to be made to account for this. The pH
+    # of the ocean influences the speciation of dissolved inorganic carbon,
+    # thus impacting the net fractionation factor when calcite is formed.
+    #
+    # ----- Inputs -----
+    # d18Oc: The 1000-member ensemble estimate of d18O of calcite from bayfox_forward (N x 1000)
+    #
+    # seatemp: SST (scalar or vector)
+    # S: SSS (scalar or vector)
+    # pH: pH values for the paleo time period (scalar)
+    # cortype: either 0 or 1. Enter 1 to use the reduced sensitivity of O. universa.
+    #
+    # ----- Outputs -----
+    #
+    # d18opH: A 1000-member ensemble estimate of d18O of calcite, corrected for
+    # the pH effect.
+    #
+    # Matlab version by J. Tierney
+    #    2021
+    # Python version by Mingsong Li
+    #     Peking University
+    #     June 23, 2021
+    """
+    
+    #
+    # ensure vector for pH
+    seatemp = np.atleast_1d(seatemp)
+    pH = np.atleast_1d(pH)
+    S = np.atleast_1d(S)
+    #normalize the curve to PI pH
+    PIpH = 8.16 # best estimate of preindustrial pH. 
+    # SOURCE: Jiang et al., 2019, https://doi.org/10.1038/s41598-019-55039-4,
+    # 1770-1850 global mean (weighted by latitude).
+    # set pH range for theoretical curve
+    # pHrange = (6.5:.01:8.8)';
+    # use alphaT to get the fractionation factor alpha
+
+    AT = alphaT(seatemp,S,pH)
+    ATb = alphaT(seatemp,S,PIpH)
+
+    # calculate carbonate and convert to VPDB scale
+    # don't need to account for d18Osw since we are interested in relative change.
+    d18Ocf =  ((AT - 1) * 1000) * 0.97001 - 29.99  #Brand et al 2014 conversion
+    d18Ocb = ((ATb - 1) * 1000) * 0.97001 - 29.99
+
+    # normalize data
+    d18OcN = d18Ocf - d18Ocb
+
+    # shape
+    d18oc_0 = d18oc.shape[0]
+    d18oc_1 = d18oc.shape[1]
+
+    if cortype == 1:
+        # use 1-sigma for Orbulina
+        dcErr = 0.14
+        # Orbulina regression
+        pH_cor = -0.27 * (pH - PIpH)
+        d18opH = d18oc + np.random.normal(np.matlib.repmat(pH_cor,d18oc_0,d18oc_1),np.matlib.repmat(dcErr,d18oc_0,d18oc_1))
+    else:
+        # define the 1-sigma error. Best estimate based on culture studies is 0.27
+        dcErr = 0.27
+        # normal random sampling
+        d18opH = d18oc + np.random.normal(np.matlib.repmat(d18OcN,1,d18oc_1),np.matlib.repmat(dcErr,d18oc_0,d18oc_1))
+
+    return Prediction(ensemble=d18opH)
 
 def predict_seatemp(d18oc, d18osw, prior_mean, prior_std, foram=None,
                     seasonal_seatemp=False, drawsfun=get_draws):
