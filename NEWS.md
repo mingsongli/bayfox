@@ -1,3 +1,13 @@
+# bayfox v1.1
+
+## Enhancements
+
+In line with bayfoxm v1.1
+
+## Bug fixes
+
+
+
 # bayfox v0.0.1a4
 
 ## Enhancements

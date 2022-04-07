@@ -6,13 +6,13 @@ def readme():
 
 setup(
     name='bayfox',
-    version='0.0.1a3',
+    version='1.1',
     description='Experimental Bayesian planktic foraminifera calibration, for Python.',
     long_description=readme(),
     long_description_content_type="text/markdown",
     license='GPLv3',
 
-    author='S. Brewster Malevich',
+    author='S. Brewster Malevich, Jessica E. Tierney, Mingsong Li',
     author_email='malevich@email.arizona.edu',
     url='https://github.com/brews/bayfox',
     # See https://pypi.python.org/pypi?%3Aaction=list_classifiers
